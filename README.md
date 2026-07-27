@@ -1,30 +1,74 @@
-# UniFreq
+<div align="center">
 
-[中文说明](README_zh.md)
+# ⚡ UniFreq
 
-UniFreq is a time-frequency encoder for time-series fault diagnosis. It
-converts variable-length, multi-channel signals into time-domain,
-frequency-domain, and fused embeddings. Pretrained checkpoints are hosted on
-Hugging Face and loaded directly with `safetensors`.
+**Pretrained time–frequency representations for machinery fault diagnosis**
 
-This repository contains inference and two downstream protocols: supervised
-classifier fine-tuning and parameter-free KNN. It contains no pretraining code.
-KNN always keeps the released UniFreq encoder frozen. Supervised fine-tuning
-adds a classifier and, by default, updates both the encoder and classifier.
+<p>
+  <a href="https://huggingface.co/bojian1/UniFreq"><img alt="Hugging Face models" src="https://img.shields.io/badge/Hugging_Face-Models-FFD21E?logo=huggingface&logoColor=black"></a>
+  <a href="https://huggingface.co/datasets/bojian1/PHMFD-data"><img alt="PHMFD dataset" src="https://img.shields.io/badge/Hugging_Face-Dataset-FFD21E?logo=huggingface&logoColor=black"></a>
+  <img alt="Python 3.9+" src="https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white">
+  <img alt="PyTorch 1.12+" src="https://img.shields.io/badge/PyTorch-1.12%2B-EE4C2C?logo=pytorch&logoColor=white">
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-green.svg"></a>
+</p>
 
-## Model variants
+[中文文档](README_zh.md) · [Model Zoo](#model-zoo) · [Quick Start](#quick-start) · [Downstream Tasks](#downstream-tasks) · [PHMFD Data](#phmfd-data)
 
-| Model | Time dim | Frequency dim | Fused dim | Heads | Layers per branch | Parameters | Weights |
+</div>
+
+UniFreq is a compact dual-branch encoder that turns variable-length,
+multi-channel vibration signals into time-domain, frequency-domain, and fused
+representations. Public checkpoints can be downloaded directly from Hugging
+Face and loaded safely with `safetensors`.
+
+This repository is designed for downstream use: feature extraction, supervised
+classifier fine-tuning, and parameter-free KNN evaluation. It does not include
+the pretraining pipeline.
+
+## ✨ Highlights
+
+- **Dual-domain representation** — complementary Transformer encoders model
+  temporal patterns and frequency structure.
+- **Flexible inputs** — supports variable-length, single-channel, and
+  multi-channel signals.
+- **Three usage modes** — extract embeddings, fine-tune a classifier, or run
+  cosine KNN without training parameters.
+- **Ready-to-use checkpoints** — tiny, small, and base variants are hosted on
+  Hugging Face.
+- **Safe and lightweight** — checkpoints use `safetensors`; Parquet data is
+  streamed in batches instead of loaded all at once.
+
+```mermaid
+flowchart LR
+    A[Raw vibration signal] --> P[UniFreqProcessor]
+    P --> T[Time encoder]
+    P --> F[Frequency encoder]
+    T --> Z[Fused representation]
+    F --> Z
+    Z --> I[Feature extraction]
+    Z --> C[Classifier fine-tuning]
+    Z --> K[Cosine KNN]
+```
+
+<a id="model-zoo"></a>
+
+## 📦 Model Zoo
+
+| Model | Time dim | Frequency dim | Fused dim | Heads | Layers / branch | Parameters | Weights |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | [UniFreq-tiny](https://huggingface.co/bojian1/UniFreq-tiny) | 64 | 64 | 128 | 2 | 4 | 420K | 1.69 MB |
 | [UniFreq-small](https://huggingface.co/bojian1/UniFreq-small) | 96 | 96 | 192 | 3 | 4 | 941K | 3.78 MB |
 | [UniFreq-base](https://huggingface.co/bojian1/UniFreq-base) | 128 | 128 | 256 | 4 | 4 | 1.67M | 6.69 MB |
 
 All variants use a 0.1-second input window, 800 non-DC frequency bins, four
-time-branch Transformer layers, four frequency-branch Transformer layers, and
-harmonic-aware frequency positional encoding.
+Transformer layers per domain, and harmonic-aware frequency positional
+encoding.
 
-## Installation
+<a id="quick-start"></a>
+
+## 🚀 Quick Start
+
+### 1. Install
 
 Python 3.9 or newer is required.
 
@@ -38,10 +82,10 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-For CUDA inference, install the PyTorch build matching your CUDA version before
+For GPU execution, install the PyTorch build matching your CUDA version before
 installing the remaining requirements.
 
-## Python API
+### 2. Extract features in Python
 
 ```python
 import numpy as np
@@ -52,80 +96,61 @@ from model import UniFreqProcessor, load_model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model, config = load_model("bojian1/UniFreq-base")
 model = model.to(device)
+processor = UniFreqProcessor(config)
 
 signals = [
     np.random.randn(2048).astype("float32"),
     np.random.randn(1600).astype("float32"),
 ]
-batch = UniFreqProcessor(config)(signals)
-batch = {name: value.to(device) for name, value in batch.items()}
+batch = {
+    name: value.to(device)
+    for name, value in processor(signals).items()
+}
 
 with torch.inference_mode():
     features = model(batch)
 
-print(features.shape)  # [2, 256] for UniFreq-base
+print(features.shape)  # torch.Size([2, 256])
 ```
 
-Samples in one batch may have different lengths, but they must have the same
-number of channels. Preprocessing follows each checkpoint's `config.json`,
-including normalization, FFT scaling, DC removal, frequency truncation, tail
-statistics, masks, and padding.
+Samples in the same batch may have different lengths, but they must have the
+same number of channels. `UniFreqProcessor` applies all checkpoint-specific
+normalization, FFT, truncation, tail-statistics, masking, and padding settings.
 
-## End-to-end inference with PHMFD data
+### 3. Extract features from a file
 
-The processed datasets are documented in
-[PHMFD-data-preprocessing](https://github.com/Bojian-Chen/PHMFD-data-preprocessing)
-and hosted in the
-[PHMFD-data](https://huggingface.co/datasets/bojian1/PHMFD-data) dataset
-repository. Download one processed Parquet split:
-
-```bash
-hf download bojian1/PHMFD-data \
-  --repo-type dataset \
-  --include "Process_data/PU/train_1shot.parquet" \
-  --local-dir data
-```
-
-Run UniFreq-base directly on the downloaded signals. The command downloads the
-model checkpoint from Hugging Face, streams the `samples` column from Parquet,
-and writes the extracted features:
+`inference.py` accepts `.parquet`, `.npy`, and `.npz` inputs:
 
 ```bash
 python inference.py \
   --model-id bojian1/UniFreq-base \
-  --input data/Process_data/PU/train_1shot.parquet \
-  --input-key samples \
-  --batch-size 8 \
-  --limit 8 \
+  --input samples.npy \
+  --input-layout NL \
+  --batch-size 32 \
   --device auto \
-  --output pu_unifreq_base_features.npz
+  --output features.npz
 ```
 
-For this example, `features`, `time_features`, and `frequency_features` have
-shapes `[8, 256]`, `[8, 128]`, and `[8, 128]`, respectively. Remove
-`--limit 8` to process the entire split.
+The model is downloaded automatically on first use. `--model-id` may also point
+to a local directory containing `config.json` and `model.safetensors`.
 
-## Downstream evaluation
+<a id="downstream-tasks"></a>
 
-Processed PHMFD Parquet files contain `samples` and `labels` columns. UniFreq
-supports the following two downstream protocols:
+## 🧠 Downstream Tasks
 
-| Protocol | Learned parameters | Reference splits | Output |
+Processed Parquet files are expected to contain `samples` and `labels` columns.
+UniFreq provides two downstream workflows through `downstream.py`.
+
+| Workflow | Learned parameters | Required splits | Main outputs |
 | --- | --- | --- | --- |
-| Classifier fine-tuning | UniFreq encoder and added MLP classifier | train / validation / test | Best model, metrics, test predictions |
-| KNN | None | reference / test | Metrics and test predictions |
-
-Both protocols download the selected UniFreq checkpoint, stream the Parquet
-data, and use fused features. Labels may be non-contiguous integers; they are
-mapped internally and written back in their original form.
+| Classifier fine-tuning | Encoder + added MLP classifier | train / validation / test | Best weights, metrics, predictions |
+| Cosine KNN | None | reference / test | Metrics, predictions |
 
 ### Classifier fine-tuning
 
-The classifier follows the TPFFT downstream design:
-`LayerNorm → Linear → GELU → Dropout → Linear`. Validation macro-F1 selects the
-best epoch. Encoder and classifier weights are saved in safe tensor format and
-reloaded before the final test evaluation. As in TPFFT, the encoder has a
-separate learning-rate multiplier:
+The added classifier uses
+`LayerNorm → Linear → GELU → Dropout → Linear`. The best epoch is selected by
+validation macro-F1, then reloaded for final test evaluation.
 
 ```bash
 python downstream.py finetune \
@@ -140,73 +165,76 @@ python downstream.py finetune \
   --output-dir outputs/ims_fd_finetune
 ```
 
-Set `--backbone-lr-scale 0` to freeze UniFreq and train only the classifier.
+The encoder and classifier are fine-tuned together by default. Set
+`--backbone-lr-scale 0` to freeze UniFreq and train only the classifier.
 
-The output directory contains:
+The output directory contains the best `model.safetensors`,
+`classifier.safetensors`, their JSON configurations, `metrics.json`, and
+per-sample `predictions.csv`.
 
-| File | Description |
-| --- | --- |
-| `config.json` | UniFreq encoder configuration |
-| `model.safetensors` | Best validation fine-tuned encoder weights |
-| `classifier.safetensors` | Best validation classifier weights |
-| `classifier_config.json` | Feature dimension, class labels, and architecture |
-| `metrics.json` | Validation and test accuracy, macro-F1, and confusion matrices |
-| `predictions.csv` | Per-sample test target and prediction |
-
-### KNN
+### Cosine KNN
 
 KNN L2-normalizes reference and query features, computes cosine similarity, and
-uses unweighted majority voting. If the requested `k` exceeds the number of
-reference samples, it is reduced automatically.
+uses unweighted majority voting.
 
 ```bash
 python downstream.py knn \
   --model-id bojian1/UniFreq-base \
-  --reference-file data/Process_data/IMS_FD/train.parquet \
-  --test-file data/Process_data/IMS_FD/test.parquet \
+  --reference-file data/Process_data/PU/train_1p.parquet \
+  --test-file data/Process_data/PU/test.parquet \
   --neighbors 5 \
   --device auto \
-  --output-dir outputs/ims_fd_knn
+  --output-dir outputs/pu_knn
 ```
 
-This writes `metrics.json` and `predictions.csv`. K-shot evaluation uses the
-corresponding processed split, such as `train_5shot.parquet`, as
-`--reference-file` or `--train-file`.
+For K-shot evaluation, pass a processed split such as
+`train_5shot.parquet` or `train_10shot.parquet` as the reference file.
 
-### Verified end-to-end run
+### PU KNN reproducibility
 
-Both paths were integration-tested on the complete IMS_FD splits with
-`UniFreq-tiny`, seed 42, and CPU. This is a pipeline check rather than a
-benchmark:
+The public checkpoints were verified on the complete PU test split using the
+1% training split as reference and cosine KNN with `k=5`.
 
-| Protocol | Train / reference | Validation | Test | Test accuracy | Test macro-F1 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Classifier fine-tuning (`backbone-lr-scale=1`, 10 epochs maximum) | 144 | 48 | 48 | 95.83% | 95.80% |
-| KNN (`k=5`) | 144 | — | 48 | 100.00% | 100.00% |
+| Model | Reference samples | Test samples | Accuracy | Macro-F1 |
+| --- | ---: | ---: | ---: | ---: |
+| UniFreq-tiny | 262 | 8,736 | 90.1442% | 90.2061% |
+| UniFreq-small | 262 | 8,736 | 91.1859% | 91.1442% |
+| UniFreq-base | 262 | 8,736 | **95.2953%** | **95.2894%** |
 
-The test also reloaded the saved fine-tuned encoder and classifier and produced
-finite logits with shape `[1, 4]`.
+<a id="phmfd-data"></a>
 
-## Command-line inference
+## 🗃️ PHMFD Data
 
-Inputs may be `.parquet`, `.npy`, or `.npz` files.
+Processed datasets are documented in
+[PHMFD-data-preprocessing](https://github.com/Bojian-Chen/PHMFD-data-preprocessing)
+and hosted in the
+[PHMFD-data](https://huggingface.co/datasets/bojian1/PHMFD-data) repository.
+
+Download a processed split with the Hugging Face CLI:
+
+```bash
+hf download bojian1/PHMFD-data \
+  --repo-type dataset \
+  --include "Process_data/PU/train_1shot.parquet" \
+  --local-dir data
+```
+
+Run feature extraction directly on the downloaded Parquet file:
 
 ```bash
 python inference.py \
   --model-id bojian1/UniFreq-base \
-  --input samples.npy \
-  --input-layout NL \
-  --batch-size 32 \
+  --input data/Process_data/PU/train_1shot.parquet \
+  --input-key samples \
+  --batch-size 8 \
   --device auto \
-  --output features.npz
+  --output pu_features.npz
 ```
 
-For Parquet files, `--input-key` selects the signal column and defaults to
-`samples`; records are streamed in batches. For `.npz` archives, it selects the
-stored array. `--model-id` may also point to a local directory containing
-`config.json` and `model.safetensors`.
+## 📐 Input and Output Reference
 
-### Input layouts
+<details>
+<summary><strong>Supported array layouts</strong></summary>
 
 | Layout | Meaning | Shape |
 | --- | --- | --- |
@@ -217,27 +245,30 @@ stored array. `--model-id` may also point to a local directory containing
 | `NCL` | Channel-first batch | `[N, C, L]` |
 | `NLC` | Channel-last batch | `[N, L, C]` |
 
-### Output arrays
+</details>
 
-The generated `.npz` archive contains:
+<details>
+<summary><strong>Feature archive contents</strong></summary>
 
 | Array | Description |
 | --- | --- |
-| `features` | Concatenated time and frequency embeddings |
-| `time_features` | Time-branch embeddings |
-| `frequency_features` | Frequency-branch embeddings |
+| `features` | Fused time-frequency representations |
+| `time_features` | Time-branch representations |
+| `frequency_features` | Frequency-branch representations |
 | `logits` | Optional classifier output when a compatible head is present |
 
-## Repository layout
+</details>
+
+## 🗂️ Repository Layout
 
 ```text
 UniFreq/
-├── downstream.py
-├── inference.py
+├── downstream.py          # Classifier fine-tuning and KNN
+├── inference.py           # Feature extraction CLI
 ├── config.example.json
 ├── model/
 │   ├── config.py
-│   ├── hub.py
+│   ├── hub.py             # Hugging Face checkpoint loading
 │   ├── preprocessing.py
 │   ├── unifreq.py
 │   ├── time_frequency_common.py
@@ -245,9 +276,9 @@ UniFreq/
 └── requirements.txt
 ```
 
-## Checkpoint format
+## 🔒 Checkpoint Format
 
-Each Hugging Face model repository contains:
+Each model repository contains:
 
 ```text
 config.json
@@ -257,6 +288,6 @@ model.safetensors
 Only `safetensors` weights are accepted. Pickled checkpoints are intentionally
 unsupported.
 
-## License
+## 📄 License
 
 UniFreq is released under the [MIT License](LICENSE).
