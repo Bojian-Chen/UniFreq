@@ -1,0 +1,38 @@
+# Python caches and environments
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+
+# Local datasets and run artifacts
+data/*
+log/*
+!log/.gitkeep
+
+# External reference repositories
+UniFault/*
+PHMT/*
+BearingGearboxFM-dev/*
+
+# Generated datasets, checkpoints, and figures
+*.csv
+*.h5
+*.parquet
+*.pth
+*.pt
+*.ckpt
+*.zip
+*.tar.gz
+*.png
+*.pdf
+*.svg
+*.npz
+
