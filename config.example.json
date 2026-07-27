@@ -1,6 +1,6 @@
 {
   "architectures": [
-    "TimeFrequencyBackbone"
+    "UniFreqModel"
   ],
   "depth": 4,
   "dropout": 0.1,
@@ -22,7 +22,7 @@
   "input_length_mode": "preserve",
   "input_target_len": 0,
   "model_arch": "timefreq",
-  "model_type": "phmfd-timefreq",
+  "model_type": "unifreq",
   "num_channels": 1,
   "num_classes": 0,
   "patch_fft_num_queries": 1,

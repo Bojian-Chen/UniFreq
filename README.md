@@ -1,92 +1,50 @@
-# PHMFD Inference
+# UniFreq
 
-这是 PHMFD 的纯推理分支，用于从 Hugging Face Hub 加载已发布的 TimeFreq
-权重并提取时域、频域及融合特征。
+[中文说明](README_zh.md)
 
-本分支不包含预训练、微调、优化器、损失函数、训练数据管线或实验 sweep
-代码，也不提供任何参数更新入口。权重请在私有训练分支完成导出后上传到
-Hugging Face。
+UniFreq is an inference-only time-frequency encoder for time-series fault
+diagnosis. It converts variable-length, multi-channel signals into time-domain,
+frequency-domain, and fused embeddings. Pretrained checkpoints are hosted on
+Hugging Face and loaded directly with `safetensors`.
 
-## 安装
+This repository contains no training loop, optimizer, loss function, or
+fine-tuning pipeline. Model parameters are frozen and the model always remains
+in evaluation mode.
 
-需要 Python 3.9 或更高版本：
+## Model variants
+
+| Model | Time dim | Frequency dim | Fused dim | Heads | Layers per branch | Parameters | Weights |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| [UniFreq-tiny](https://huggingface.co/bojian1/UniFreq-tiny) | 64 | 64 | 128 | 2 | 4 | 420K | 1.69 MB |
+| [UniFreq-small](https://huggingface.co/bojian1/UniFreq-small) | 96 | 96 | 192 | 3 | 4 | 941K | 3.78 MB |
+| [UniFreq-base](https://huggingface.co/bojian1/UniFreq-base) | 128 | 128 | 256 | 4 | 4 | 1.67M | 6.69 MB |
+
+All variants use a 0.1-second input window, 800 non-DC frequency bins, four
+time-branch Transformer layers, four frequency-branch Transformer layers, and
+harmonic-aware frequency positional encoding.
+
+The Hugging Face repositories are currently private. Authenticate before use:
 
 ```bash
+hf auth login
+```
+
+## Installation
+
+Python 3.9 or newer is required.
+
+```bash
+git clone https://github.com/Bojian-Chen/UniFreq.git
+cd UniFreq
+
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-## Hugging Face 仓库格式
-
-模型仓库至少需要两个文件：
-
-```text
-your-name/your-model
-├── config.json
-└── model.safetensors
-```
-
-`config.json` 描述推理结构和输入预处理。仓库中的
-[`config.example.json`](config.example.json) 是当前默认 TimeFreq 模型的模板；
-上传前请确认参数与导出权重完全一致。
-
-`model.safetensors` 应使用模型的原始 state-dict 键名。加载器会兼容 DDP
-导出的 `module.` 前缀，并忽略旧 checkpoint 中仅供训练使用的两个 projector；
-其余键仍会严格校验缺失、额外项和张量形状。
-这里有意只接受 `safetensors`，避免对 Hub 上的 pickle checkpoint 执行反序列化。
-
-私有 Hugging Face 仓库可先设置：
-
-```bash
-export HF_TOKEN=hf_xxx
-```
-
-## 命令行推理
-
-输入支持 `.npy` 和 `.npz`。下面的例子将 `[N, L]` 单通道时序转换为特征：
-
-```bash
-python inference.py \
-  --model-id your-name/your-model \
-  --input samples.npy \
-  --input-layout NL \
-  --output features.npz
-```
-
-如需固定 Hub revision：
-
-```bash
-python inference.py \
-  --model-id your-name/your-model \
-  --revision COMMIT_SHA \
-  --input samples.npy \
-  --input-layout NCL \
-  --batch-size 32 \
-  --device cuda \
-  --output features.npz
-```
-
-`--model-id` 也可以是本地模型目录，便于上传前离线验证。
-
-输入布局：
-
-| 参数 | 输入形状 |
-| --- | --- |
-| `L` | 单个单通道样本 `[L]` |
-| `NL` | 一批单通道样本 `[N, L]` |
-| `CL` | 单个多通道样本 `[C, L]` |
-| `LC` | 单个多通道样本 `[L, C]` |
-| `NCL` | 一批多通道样本 `[N, C, L]` |
-| `NLC` | 一批多通道样本 `[N, L, C]` |
-
-输出 `.npz` 包含：
-
-- `features`：时域与频域融合后的 backbone 特征；
-- `time_features`：时域分支特征；
-- `frequency_features`：频域分支特征；
-- `logits`：仅当 Hub 权重包含分类头时写出。
+For CUDA inference, install the PyTorch build matching your CUDA version before
+installing the remaining requirements.
 
 ## Python API
 
@@ -94,29 +52,98 @@ python inference.py \
 import numpy as np
 import torch
 
-from model import PHMFDProcessor, load_model
+from model import UniFreqProcessor, load_model
 
-model, config = load_model("your-name/your-model")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = model.to(device).eval()
+model, config = load_model("bojian1/UniFreq-base")
+model = model.to(device)
 
-signals = [np.random.randn(2048), np.random.randn(1600)]
-batch = PHMFDProcessor(config)(signals)
+signals = [
+    np.random.randn(2048).astype("float32"),
+    np.random.randn(1600).astype("float32"),
+]
+batch = UniFreqProcessor(config)(signals)
 batch = {name: value.to(device) for name, value in batch.items()}
 
 with torch.inference_mode():
     features = model(batch)
+
+print(features.shape)  # [2, 256] for UniFreq-base
 ```
 
-同一 batch 内样本可以变长，但通道数必须一致。处理器会按 `config.json`
-完成归一化、FFT、非 DC 频点截取、tail statistics 和 padding，确保预处理与
-发布权重一致。
+Samples in one batch may have different lengths, but they must have the same
+number of channels. Preprocessing follows each checkpoint's `config.json`,
+including normalization, FFT scaling, DC removal, frequency truncation, tail
+statistics, masks, and padding.
 
-## 本地验证
+## Command-line inference
+
+Inputs may be `.npy` files or `.npz` archives.
 
 ```bash
-python -m py_compile inference.py model/*.py tests/*.py
-python -m pytest -q
+python inference.py \
+  --model-id bojian1/UniFreq-base \
+  --input samples.npy \
+  --input-layout NL \
+  --batch-size 32 \
+  --device auto \
+  --output features.npz
 ```
 
-纯前向 smoke test 不需要下载数据集或访问 Hugging Face。
+Use `--input-key` to select an array from an `.npz` archive. `--model-id` may
+also point to a local directory containing `config.json` and
+`model.safetensors`.
+
+### Input layouts
+
+| Layout | Meaning | Shape |
+| --- | --- | --- |
+| `L` | One single-channel sample | `[L]` |
+| `NL` | Batch of single-channel samples | `[N, L]` |
+| `CL` | One channel-first sample | `[C, L]` |
+| `LC` | One channel-last sample | `[L, C]` |
+| `NCL` | Channel-first batch | `[N, C, L]` |
+| `NLC` | Channel-last batch | `[N, L, C]` |
+
+### Output arrays
+
+The generated `.npz` archive contains:
+
+| Array | Description |
+| --- | --- |
+| `features` | Concatenated time and frequency embeddings |
+| `time_features` | Time-branch embeddings |
+| `frequency_features` | Frequency-branch embeddings |
+| `logits` | Optional classifier output when a compatible head is present |
+
+## Repository layout
+
+```text
+UniFreq/
+├── inference.py
+├── config.example.json
+├── model/
+│   ├── config.py
+│   ├── hub.py
+│   ├── preprocessing.py
+│   ├── unifreq.py
+│   ├── time_frequency_common.py
+│   └── time_frequency_tokenizers.py
+└── requirements.txt
+```
+
+## Checkpoint format
+
+Each Hugging Face model repository contains:
+
+```text
+config.json
+model.safetensors
+```
+
+Only `safetensors` weights are accepted. Pickled checkpoints are intentionally
+unsupported.
+
+## License
+
+UniFreq is released under the [MIT License](LICENSE).

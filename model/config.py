@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 
 DEFAULT_CONFIG = {
-    "model_type": "phmfd-timefreq",
-    "architectures": ["TimeFrequencyBackbone"],
+    "model_type": "unifreq",
+    "architectures": ["UniFreqModel"],
     "model_arch": "timefreq",
     "num_classes": 0,
     "num_channels": 1,
@@ -39,7 +39,7 @@ DEFAULT_CONFIG = {
 }
 
 
-class PHMFDConfig(SimpleNamespace):
+class UniFreqConfig(SimpleNamespace):
     config_name = "config.json"
 
     def __init__(self, **values):

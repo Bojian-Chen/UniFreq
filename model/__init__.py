@@ -1,11 +1,11 @@
-from model.config import PHMFDConfig
+from model.config import UniFreqConfig
 from model.hub import load_model
-from model.preprocessing import PHMFDProcessor
-from model.timefreq import TimeFrequencyBackbone
+from model.preprocessing import UniFreqProcessor
+from model.unifreq import UniFreqModel
 
 __all__ = [
-    "PHMFDConfig",
-    "PHMFDProcessor",
-    "TimeFrequencyBackbone",
+    "UniFreqConfig",
+    "UniFreqModel",
+    "UniFreqProcessor",
     "load_model",
 ]

@@ -67,7 +67,7 @@ def _tail_statistics(spectrum, kept_len):
     return result
 
 
-class PHMFDProcessor:
+class UniFreqProcessor:
     def __init__(self, config):
         self.config = config
 

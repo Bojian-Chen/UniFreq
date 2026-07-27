@@ -4,13 +4,13 @@ import os
 import numpy as np
 import torch
 
-from model import PHMFDProcessor
+from model import UniFreqProcessor
 from model import load_model
 
 
 def build_parser():
     parser = argparse.ArgumentParser(
-        description="Extract PHMFD features from a Hugging Face checkpoint."
+        description="Extract UniFreq features from a Hugging Face checkpoint."
     )
     parser.add_argument("--model-id", required=True)
     parser.add_argument("--revision", default=None)
@@ -98,7 +98,7 @@ def run(args):
     )
     device = _select_device(args.device)
     model = model.to(device).eval()
-    processor = PHMFDProcessor(config)
+    processor = UniFreqProcessor(config)
 
     outputs = {
         "features": [],

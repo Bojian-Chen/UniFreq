@@ -3,8 +3,8 @@ import os
 from huggingface_hub import hf_hub_download
 from safetensors.torch import load_file
 
-from model.config import PHMFDConfig
-from model.timefreq import TimeFrequencyBackbone
+from model.config import UniFreqConfig
+from model.unifreq import UniFreqModel
 
 
 def _resolve_file(
@@ -55,7 +55,7 @@ def load_model(
     weights_filename="model.safetensors",
     strict=True,
 ):
-    """Load a forward-only PHMFD model from a local or Hugging Face directory."""
+    """Load a frozen UniFreq model from a local or Hugging Face directory."""
     config_path = _resolve_file(
         model_id,
         config_filename,
@@ -72,8 +72,8 @@ def load_model(
         cache_dir=cache_dir,
         local_files_only=local_files_only,
     )
-    config = PHMFDConfig.from_json_file(config_path)
-    model = TimeFrequencyBackbone(config)
+    config = UniFreqConfig.from_json_file(config_path)
+    model = UniFreqModel(config)
     state_dict = _without_ddp_prefix(load_file(weights_path, device="cpu"))
     state_dict = _inference_state_dict(state_dict)
     incompatible = model.load_state_dict(state_dict, strict=bool(strict))

@@ -17,7 +17,7 @@ from model.time_frequency_tokenizers import FrequencyBinTokenizer
 from model.time_frequency_tokenizers import PatchFFTTokenizer
 
 
-class TimeFrequencyBackbone(nn.Module, TimeFrequencyFeatureMixin):
+class UniFreqModel(nn.Module, TimeFrequencyFeatureMixin):
     def __init__(self, args):
         super().__init__()
         self.args = args
