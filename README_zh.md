@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ UniFreq
+# UniFreq
 
 **面向机械故障诊断的预训练时频表征模型**
 
@@ -178,17 +178,6 @@ python downstream.py knn \
 
 进行 K-shot 评估时，将 `train_5shot.parquet` 或 `train_10shot.parquet` 等处理后
 划分作为 reference 文件。
-
-### PU KNN 复现结果
-
-三个公开 checkpoint 均已在完整 PU 测试集上完成验证，使用 1% 训练集作为
-reference，并采用 `k=5` 的余弦 KNN。
-
-| 模型 | Reference 样本 | 测试样本 | Accuracy | Macro-F1 |
-| --- | ---: | ---: | ---: | ---: |
-| UniFreq-tiny | 262 | 8,736 | 90.1442% | 90.2061% |
-| UniFreq-small | 262 | 8,736 | 91.1859% | 91.1442% |
-| UniFreq-base | 262 | 8,736 | **95.2953%** | **95.2894%** |
 
 <a id="phmfd-data"></a>
 

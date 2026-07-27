@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ UniFreq
+# UniFreq
 
 **Pretrained time–frequency representations for machinery fault diagnosis**
 
@@ -189,17 +189,6 @@ python downstream.py knn \
 
 For K-shot evaluation, pass a processed split such as
 `train_5shot.parquet` or `train_10shot.parquet` as the reference file.
-
-### PU KNN reproducibility
-
-The public checkpoints were verified on the complete PU test split using the
-1% training split as reference and cosine KNN with `k=5`.
-
-| Model | Reference samples | Test samples | Accuracy | Macro-F1 |
-| --- | ---: | ---: | ---: | ---: |
-| UniFreq-tiny | 262 | 8,736 | 90.1442% | 90.2061% |
-| UniFreq-small | 262 | 8,736 | 91.1859% | 91.1442% |
-| UniFreq-base | 262 | 8,736 | **95.2953%** | **95.2894%** |
 
 <a id="phmfd-data"></a>
 
