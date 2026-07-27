@@ -23,12 +23,6 @@ All variants use a 0.1-second input window, 800 non-DC frequency bins, four
 time-branch Transformer layers, four frequency-branch Transformer layers, and
 harmonic-aware frequency positional encoding.
 
-The Hugging Face repositories are currently private. Authenticate before use:
-
-```bash
-hf auth login
-```
-
 ## Installation
 
 Python 3.9 or newer is required.
@@ -76,9 +70,43 @@ number of channels. Preprocessing follows each checkpoint's `config.json`,
 including normalization, FFT scaling, DC removal, frequency truncation, tail
 statistics, masks, and padding.
 
+## End-to-end inference with PHMFD data
+
+The processed datasets are documented in
+[PHMFD-data-preprocessing](https://github.com/Bojian-Chen/PHMFD-data-preprocessing)
+and hosted in the
+[PHMFD-data](https://huggingface.co/datasets/bojian1/PHMFD-data) dataset
+repository. Download one processed Parquet split:
+
+```bash
+hf download bojian1/PHMFD-data \
+  --repo-type dataset \
+  --include "Process_data/PU/train_1shot.parquet" \
+  --local-dir data
+```
+
+Run UniFreq-base directly on the downloaded signals. The command downloads the
+model checkpoint from Hugging Face, streams the `samples` column from Parquet,
+and writes the extracted features:
+
+```bash
+python inference.py \
+  --model-id bojian1/UniFreq-base \
+  --input data/Process_data/PU/train_1shot.parquet \
+  --input-key samples \
+  --batch-size 8 \
+  --limit 8 \
+  --device auto \
+  --output pu_unifreq_base_features.npz
+```
+
+For this example, `features`, `time_features`, and `frequency_features` have
+shapes `[8, 256]`, `[8, 128]`, and `[8, 128]`, respectively. Remove
+`--limit 8` to process the entire split.
+
 ## Command-line inference
 
-Inputs may be `.npy` files or `.npz` archives.
+Inputs may be `.parquet`, `.npy`, or `.npz` files.
 
 ```bash
 python inference.py \
@@ -90,9 +118,10 @@ python inference.py \
   --output features.npz
 ```
 
-Use `--input-key` to select an array from an `.npz` archive. `--model-id` may
-also point to a local directory containing `config.json` and
-`model.safetensors`.
+For Parquet files, `--input-key` selects the signal column and defaults to
+`samples`; records are streamed in batches. For `.npz` archives, it selects the
+stored array. `--model-id` may also point to a local directory containing
+`config.json` and `model.safetensors`.
 
 ### Input layouts
 
