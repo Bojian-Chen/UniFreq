@@ -21,7 +21,7 @@
   "heads": 4,
   "input_length_mode": "preserve",
   "input_target_len": 0,
-  "model_arch": "timefreq",
+  "model_arch": "unifreq",
   "model_type": "unifreq",
   "num_channels": 1,
   "num_classes": 0,

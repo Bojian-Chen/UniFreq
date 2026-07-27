@@ -6,7 +6,7 @@ from types import SimpleNamespace
 DEFAULT_CONFIG = {
     "model_type": "unifreq",
     "architectures": ["UniFreqModel"],
-    "model_arch": "timefreq",
+    "model_arch": "unifreq",
     "num_classes": 0,
     "num_channels": 1,
     "embed_dim": 128,
@@ -49,8 +49,8 @@ class UniFreqConfig(SimpleNamespace):
         self._validate()
 
     def _validate(self):
-        if self.model_arch != "timefreq":
-            raise ValueError("This branch only supports model_arch=timefreq")
+        if self.model_arch != "unifreq":
+            raise ValueError("This repository only supports model_arch=unifreq")
         if int(self.num_classes) < 0:
             raise ValueError("num_classes must be >= 0")
         if int(self.embed_dim) <= 0:
