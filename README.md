@@ -2,14 +2,15 @@
 
 [中文说明](README_zh.md)
 
-UniFreq is an inference-only time-frequency encoder for time-series fault
-diagnosis. It converts variable-length, multi-channel signals into time-domain,
+UniFreq is a time-frequency encoder for time-series fault diagnosis. It
+converts variable-length, multi-channel signals into time-domain,
 frequency-domain, and fused embeddings. Pretrained checkpoints are hosted on
 Hugging Face and loaded directly with `safetensors`.
 
-This repository contains no training loop, optimizer, loss function, or
-fine-tuning pipeline. Model parameters are frozen and the model always remains
-in evaluation mode.
+This repository contains inference and two downstream protocols: supervised
+classifier fine-tuning and parameter-free KNN. It contains no pretraining code.
+KNN always keeps the released UniFreq encoder frozen. Supervised fine-tuning
+adds a classifier and, by default, updates both the encoder and classifier.
 
 ## Model variants
 
@@ -104,6 +105,88 @@ For this example, `features`, `time_features`, and `frequency_features` have
 shapes `[8, 256]`, `[8, 128]`, and `[8, 128]`, respectively. Remove
 `--limit 8` to process the entire split.
 
+## Downstream evaluation
+
+Processed PHMFD Parquet files contain `samples` and `labels` columns. UniFreq
+supports the following two downstream protocols:
+
+| Protocol | Learned parameters | Reference splits | Output |
+| --- | --- | --- | --- |
+| Classifier fine-tuning | UniFreq encoder and added MLP classifier | train / validation / test | Best model, metrics, test predictions |
+| KNN | None | reference / test | Metrics and test predictions |
+
+Both protocols download the selected UniFreq checkpoint, stream the Parquet
+data, and use fused features. Labels may be non-contiguous integers; they are
+mapped internally and written back in their original form.
+
+### Classifier fine-tuning
+
+The classifier follows the TPFFT downstream design:
+`LayerNorm → Linear → GELU → Dropout → Linear`. Validation macro-F1 selects the
+best epoch. Encoder and classifier weights are saved in safe tensor format and
+reloaded before the final test evaluation. As in TPFFT, the encoder has a
+separate learning-rate multiplier:
+
+```bash
+python downstream.py finetune \
+  --model-id bojian1/UniFreq-base \
+  --train-file data/Process_data/IMS_FD/train.parquet \
+  --val-file data/Process_data/IMS_FD/val.parquet \
+  --test-file data/Process_data/IMS_FD/test.parquet \
+  --epochs 100 \
+  --batch-size 64 \
+  --backbone-lr-scale 1.0 \
+  --device auto \
+  --output-dir outputs/ims_fd_finetune
+```
+
+Set `--backbone-lr-scale 0` to freeze UniFreq and train only the classifier.
+
+The output directory contains:
+
+| File | Description |
+| --- | --- |
+| `config.json` | UniFreq encoder configuration |
+| `model.safetensors` | Best validation fine-tuned encoder weights |
+| `classifier.safetensors` | Best validation classifier weights |
+| `classifier_config.json` | Feature dimension, class labels, and architecture |
+| `metrics.json` | Validation and test accuracy, macro-F1, and confusion matrices |
+| `predictions.csv` | Per-sample test target and prediction |
+
+### KNN
+
+KNN L2-normalizes reference and query features, computes cosine similarity, and
+uses unweighted majority voting. If the requested `k` exceeds the number of
+reference samples, it is reduced automatically.
+
+```bash
+python downstream.py knn \
+  --model-id bojian1/UniFreq-base \
+  --reference-file data/Process_data/IMS_FD/train.parquet \
+  --test-file data/Process_data/IMS_FD/test.parquet \
+  --neighbors 5 \
+  --device auto \
+  --output-dir outputs/ims_fd_knn
+```
+
+This writes `metrics.json` and `predictions.csv`. K-shot evaluation uses the
+corresponding processed split, such as `train_5shot.parquet`, as
+`--reference-file` or `--train-file`.
+
+### Verified end-to-end run
+
+Both paths were integration-tested on the complete IMS_FD splits with
+`UniFreq-tiny`, seed 42, and CPU. This is a pipeline check rather than a
+benchmark:
+
+| Protocol | Train / reference | Validation | Test | Test accuracy | Test macro-F1 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Classifier fine-tuning (`backbone-lr-scale=1`, 10 epochs maximum) | 144 | 48 | 48 | 95.83% | 95.80% |
+| KNN (`k=5`) | 144 | — | 48 | 100.00% | 100.00% |
+
+The test also reloaded the saved fine-tuned encoder and classifier and produced
+finite logits with shape `[1, 4]`.
+
 ## Command-line inference
 
 Inputs may be `.parquet`, `.npy`, or `.npz` files.
@@ -149,6 +232,7 @@ The generated `.npz` archive contains:
 
 ```text
 UniFreq/
+├── downstream.py
 ├── inference.py
 ├── config.example.json
 ├── model/

@@ -2,12 +2,13 @@
 
 [English](README.md)
 
-UniFreq 是一个面向时序故障诊断的纯推理时频编码器，可以将变长、多通道时序
-转换为时域、频域和融合特征。已发布的权重托管在 Hugging Face，并通过
+UniFreq 是一个面向时序故障诊断的时频编码器，可以将变长、多通道时序转换为
+时域、频域和融合特征。已发布的权重托管在 Hugging Face，并通过
 `safetensors` 直接加载。
 
-本仓库不包含训练循环、优化器、损失函数或微调流程。模型参数已冻结，并始终
-保持在评估模式。
+本仓库提供推理以及两种下游协议：监督分类器微调和无参数 KNN，但不包含任何
+预训练代码。KNN 始终冻结已发布的 UniFreq 编码器；监督微调会增加分类器，
+并默认同时更新编码器和分类器。
 
 ## 模型版本
 
@@ -97,6 +98,84 @@ python inference.py \
 在该示例中，`features`、`time_features` 和 `frequency_features` 的形状分别为
 `[8, 256]`、`[8, 128]` 和 `[8, 128]`。移除 `--limit 8` 即可处理完整 split。
 
+## 下游评估
+
+处理后的 PHMFD Parquet 文件包含 `samples` 和 `labels` 列。UniFreq 支持以下
+两种下游协议：
+
+| 协议 | 训练参数 | 使用的数据划分 | 输出 |
+| --- | --- | --- | --- |
+| 分类器微调 | UniFreq 编码器与新增的 MLP 分类器 | train / validation / test | 最佳模型、指标、测试集预测 |
+| KNN | 无 | reference / test | 指标、测试集预测 |
+
+两种协议都会下载所选 UniFreq checkpoint、流式读取 Parquet 并使用融合特征。
+标签可以是不连续整数；程序会在内部映射，并在输出时恢复原始标签。
+
+### 分类器微调
+
+分类器沿用 TPFFT 的下游设计：
+`LayerNorm → Linear → GELU → Dropout → Linear`。程序按验证集 macro-F1 选择
+最佳 epoch，以安全张量格式保存编码器和分类器，并在最终测试前重新加载最佳
+权重。与 TPFFT 一样，编码器使用独立的学习率倍率：
+
+```bash
+python downstream.py finetune \
+  --model-id bojian1/UniFreq-base \
+  --train-file data/Process_data/IMS_FD/train.parquet \
+  --val-file data/Process_data/IMS_FD/val.parquet \
+  --test-file data/Process_data/IMS_FD/test.parquet \
+  --epochs 100 \
+  --batch-size 64 \
+  --backbone-lr-scale 1.0 \
+  --device auto \
+  --output-dir outputs/ims_fd_finetune
+```
+
+设置 `--backbone-lr-scale 0` 可以冻结 UniFreq，仅训练新增分类器。
+
+输出目录包含：
+
+| 文件 | 说明 |
+| --- | --- |
+| `config.json` | UniFreq 编码器配置 |
+| `model.safetensors` | 验证集表现最佳的微调后编码器权重 |
+| `classifier.safetensors` | 验证集表现最佳的分类器权重 |
+| `classifier_config.json` | 特征维度、原始类别标签和分类器结构 |
+| `metrics.json` | 验证与测试集的准确率、macro-F1 和混淆矩阵 |
+| `predictions.csv` | 每个测试样本的真实标签与预测标签 |
+
+### KNN
+
+KNN 会对 reference 和 query 特征进行 L2 归一化，计算余弦相似度，再执行无权重
+多数投票。如果指定的 `k` 大于 reference 样本数，程序会自动缩小 `k`。
+
+```bash
+python downstream.py knn \
+  --model-id bojian1/UniFreq-base \
+  --reference-file data/Process_data/IMS_FD/train.parquet \
+  --test-file data/Process_data/IMS_FD/test.parquet \
+  --neighbors 5 \
+  --device auto \
+  --output-dir outputs/ims_fd_knn
+```
+
+该命令生成 `metrics.json` 和 `predictions.csv`。进行 K-shot 评估时，将对应的
+处理后划分（例如 `train_5shot.parquet`）传给 `--reference-file` 或
+`--train-file`。
+
+### 端到端验证结果
+
+两条路径均已在完整 IMS_FD 划分上使用 `UniFreq-tiny`、seed 42 和 CPU
+完成集成验证。下表用于验证流程正确性，并非基准结果：
+
+| 协议 | 训练 / reference | 验证 | 测试 | 测试准确率 | 测试 macro-F1 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 分类器微调（`backbone-lr-scale=1`，最多 10 epochs） | 144 | 48 | 48 | 95.83% | 95.80% |
+| KNN（`k=5`） | 144 | — | 48 | 100.00% | 100.00% |
+
+验证还重新加载了保存的微调编码器和分类器，并成功得到形状为 `[1, 4]` 的有限
+logits。
+
 ## 命令行推理
 
 输入支持 `.parquet`、`.npy` 和 `.npz`：
@@ -141,6 +220,7 @@ python inference.py \
 
 ```text
 UniFreq/
+├── downstream.py
 ├── inference.py
 ├── config.example.json
 ├── model/

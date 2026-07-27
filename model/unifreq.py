@@ -20,6 +20,7 @@ from model.time_frequency_tokenizers import PatchFFTTokenizer
 class UniFreqModel(nn.Module, TimeFrequencyFeatureMixin):
     def __init__(self, args):
         super().__init__()
+        self._finetuning_enabled = False
         self.args = args
         self.embed_dim = int(args.embed_dim)
         self.num_classes = int(args.num_classes)
@@ -97,7 +98,19 @@ class UniFreqModel(nn.Module, TimeFrequencyFeatureMixin):
         super().train(False)
 
     def train(self, mode=True):
-        """Keep this public branch in deterministic inference mode."""
+        """Remain in evaluation mode unless downstream fine-tuning is enabled."""
+        return super().train(bool(mode) if self._finetuning_enabled else False)
+
+    def enable_finetuning(self):
+        """Enable gradients and training mode for downstream supervised tuning."""
+        self._finetuning_enabled = True
+        self.requires_grad_(True)
+        return super().train(True)
+
+    def disable_finetuning(self):
+        """Restore the frozen inference behavior used by feature extraction."""
+        self._finetuning_enabled = False
+        self.requires_grad_(False)
         return super().train(False)
 
     def _unpack(self, batch):
