@@ -7,6 +7,17 @@ DEFAULT_CONFIG = {
     "model_type": "unifreq",
     "architectures": ["UniFreqModel"],
     "model_arch": "unifreq",
+    "seq_len": 1024,
+    "unifault_patch_size": 64,
+    "tf_profm_input_len": 2048,
+    "tf_profm_patch_len": 256,
+    "tf_profm_num_patches": 16,
+    "tf_profm_d_model": 256,
+    "tf_profm_d_ffn": 512,
+    "tf_profm_layers": 6,
+    "tf_profm_heads": 4,
+    "tf_profm_feature_dim": 4096,
+    "tf_profm_head_hidden": 256,
     "num_classes": 0,
     "num_channels": 1,
     "embed_dim": 128,
@@ -45,17 +56,58 @@ class UniFreqConfig(SimpleNamespace):
     def __init__(self, **values):
         merged = dict(DEFAULT_CONFIG)
         merged.update(values)
+        if merged["model_arch"] == "timefreq":
+            merged["model_arch"] = "unifreq"
+        arch = merged["model_arch"]
+        if arch in ("unifault", "TF-ProFM"):
+            merged["model_type"] = values.get("model_type", "phmfd-" + arch.lower())
+            merged["architectures"] = values.get("architectures", [
+                "UniFaultBackbone" if arch == "unifault" else "TFProFMBackbone"
+            ])
+            merged["input_length_mode"] = values.get(
+                "input_length_mode",
+                "resample" if arch == "unifault" else "resample_short_truncate_long",
+            )
+            merged["input_target_len"] = values.get(
+                "input_target_len",
+                merged["seq_len"] if arch == "unifault" else merged["tf_profm_input_len"],
+            )
         super().__init__(**merged)
         self._validate()
 
     def _validate(self):
-        if self.model_arch != "unifreq":
-            raise ValueError("This repository only supports model_arch=unifreq")
+        if self.model_arch not in ("unifreq", "unifault", "TF-ProFM"):
+            raise ValueError("Unsupported model_arch: %s" % self.model_arch)
+        if self.model_arch == "unifault":
+            if (int(self.seq_len) <= 0 or int(self.unifault_patch_size) <= 0
+                    or int(self.seq_len) % int(self.unifault_patch_size)):
+                raise ValueError("seq_len must be positive and divisible by unifault_patch_size")
+            if int(self.num_channels) <= 0 or int(self.depth) <= 0:
+                raise ValueError("num_channels and depth must be positive")
+        if self.model_arch == "TF-ProFM":
+            for name in (
+                "input_len", "patch_len", "num_patches", "d_model", "d_ffn",
+                "layers", "heads", "feature_dim", "head_hidden",
+            ):
+                if int(getattr(self, "tf_profm_" + name)) <= 0:
+                    raise ValueError("tf_profm_%s must be positive" % name)
+            if int(self.tf_profm_d_model) % int(self.tf_profm_heads):
+                raise ValueError("tf_profm_d_model must be divisible by tf_profm_heads")
+        if self.model_arch != "unifreq" and self.input_length_mode != "preserve":
+            expected = self.seq_len if self.model_arch == "unifault" else self.tf_profm_input_len
+            if int(self.input_target_len) != int(expected):
+                raise ValueError("input_target_len must match the model input length")
         if int(self.num_classes) < 0:
             raise ValueError("num_classes must be >= 0")
         if int(self.embed_dim) <= 0:
             raise ValueError("embed_dim must be > 0")
-        if int(self.heads) <= 0 or int(self.embed_dim) % int(self.heads) != 0:
+        if int(self.heads) <= 0:
+            raise ValueError("heads must be positive")
+        if self.model_arch == "unifault":
+            # Original UniFault uses floor(embed_dim / heads) per attention head.
+            if int(self.heads) > int(self.embed_dim):
+                raise ValueError("UniFault heads must not exceed embed_dim")
+        elif int(self.embed_dim) % int(self.heads) != 0:
             raise ValueError("embed_dim must be divisible by heads")
         if float(self.window_seconds) <= 0:
             raise ValueError("window_seconds must be > 0")

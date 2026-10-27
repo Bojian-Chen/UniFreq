@@ -427,7 +427,9 @@ def run_finetune(args):
     )
     classes = _class_labels(train_labels, val_labels, test_labels)
     feature_dim = int(config.embed_dim)
-    if config.timefreq_fusion == "concat":
+    if config.model_arch == "TF-ProFM":
+        feature_dim = int(config.tf_profm_feature_dim)
+    elif config.model_arch == "unifreq" and config.timefreq_fusion == "concat":
         feature_dim *= 2
     classifier = UniFreqClassifier(
         feature_dim,

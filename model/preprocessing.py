@@ -83,9 +83,18 @@ class UniFreqProcessor:
         if raw.shape[-1] < 2:
             raise ValueError("Each sample must contain at least two time points")
 
+        if self.config.model_arch != "unifreq":
+            expected = (self.config.seq_len if self.config.model_arch == "unifault"
+                        else self.config.tf_profm_input_len)
+            if raw.shape[-1] != int(expected):
+                raise ValueError("Input length must match model input length %d" % expected)
+            if (self.config.model_arch == "unifault"
+                    and raw.shape[0] != int(self.config.num_channels)):
+                raise ValueError("Input channels must match num_channels")
         time_x = _normalize(raw, self.config.time_data_normalize)
         result = {"time_x": time_x.contiguous()}
-        if self.config.freq_tokenizer != "global_fft":
+        if (self.config.model_arch != "unifreq"
+                or self.config.freq_tokenizer != "global_fft"):
             return result
 
         freq_source = _normalize(
@@ -128,7 +137,8 @@ class UniFreqProcessor:
             "time_mask": torch.stack(time_masks),
         }
 
-        if self.config.freq_tokenizer != "global_fft":
+        if (self.config.model_arch != "unifreq"
+                or self.config.freq_tokenizer != "global_fft"):
             return batch
 
         max_bins = int(self.config.freq_max_bins)

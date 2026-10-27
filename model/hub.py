@@ -5,6 +5,8 @@ from safetensors.torch import load_file
 
 from model.config import UniFreqConfig
 from model.unifreq import UniFreqModel
+from model.unifault import UniFaultBackbone
+from model.tf_profm import TFProFMBackbone
 
 
 def _resolve_file(
@@ -36,8 +38,12 @@ def _without_ddp_prefix(state_dict):
     return state_dict
 
 
-def _inference_state_dict(state_dict):
-    ignored_prefixes = ("time_projector.", "freq_projector.")
+def _inference_state_dict(state_dict, model_arch="unifreq"):
+    ignored_prefixes = {
+        "unifreq": ("time_projector.", "freq_projector."),
+        "unifault": (),
+        "TF-ProFM": ("instance_head.", "cluster_head."),
+    }[model_arch]
     return {
         name: value
         for name, value in state_dict.items()
@@ -55,7 +61,7 @@ def load_model(
     weights_filename="model.safetensors",
     strict=True,
 ):
-    """Load a frozen UniFreq model from a local or Hugging Face directory."""
+    """Load a forward-only PHMFD model from a local or Hugging Face directory."""
     config_path = _resolve_file(
         model_id,
         config_filename,
@@ -73,9 +79,13 @@ def load_model(
         local_files_only=local_files_only,
     )
     config = UniFreqConfig.from_json_file(config_path)
-    model = UniFreqModel(config)
+    model = {
+        "unifreq": UniFreqModel,
+        "unifault": UniFaultBackbone,
+        "TF-ProFM": TFProFMBackbone,
+    }[config.model_arch](config)
     state_dict = _without_ddp_prefix(load_file(weights_path, device="cpu"))
-    state_dict = _inference_state_dict(state_dict)
+    state_dict = _inference_state_dict(state_dict, config.model_arch)
     incompatible = model.load_state_dict(state_dict, strict=bool(strict))
     if not strict and (incompatible.missing_keys or incompatible.unexpected_keys):
         print(

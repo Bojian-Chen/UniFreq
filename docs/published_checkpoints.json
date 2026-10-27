@@ -1,0 +1,137 @@
+[
+  {
+    "repo_id": "bojian1/TF-ProFM",
+    "seed": 42,
+    "source_checkpoint": "log/TF-ProFM/tf_profm_default-2c740181/pretrain/best_pretrain.pt",
+    "source_sha256": "35476726545440ba484f620f53d96b8a4ff2ba9c19ce7055932871b6d597f103",
+    "source_commit": "a5015b9d321dec0fd546e0dbd5184127c3a3715e",
+    "epoch": 1,
+    "features_shape": [
+      2,
+      4096
+    ],
+    "max_abs_error": 0.0,
+    "revision": "seed-42",
+    "hub_commit": "56079c6adee4d209d35bbfef1b0f8de0d37cc861"
+  },
+  {
+    "repo_id": "bojian1/TF-ProFM",
+    "seed": 43,
+    "source_checkpoint": "log/TF-ProFM/tf_profm_default-6f421537/pretrain/best_pretrain.pt",
+    "source_sha256": "b0f26d255a66634c3ba721fd8614af29b3b0845d2de9763faaf6819f6c429d42",
+    "source_commit": "a5015b9d321dec0fd546e0dbd5184127c3a3715e",
+    "epoch": 1,
+    "features_shape": [
+      2,
+      4096
+    ],
+    "max_abs_error": 0.0,
+    "revision": "seed-43",
+    "hub_commit": "e63702e19507d42be2a082fd7d7f5881255424e2"
+  },
+  {
+    "repo_id": "bojian1/TF-ProFM",
+    "seed": 44,
+    "source_checkpoint": "log/TF-ProFM/tf_profm_default-4f35c45b/pretrain/best_pretrain.pt",
+    "source_sha256": "d465a98fe0b5a5481c9b03485951d724abd2978daf99371d09fc95f3fd85322d",
+    "source_commit": "a5015b9d321dec0fd546e0dbd5184127c3a3715e",
+    "epoch": 1,
+    "features_shape": [
+      2,
+      4096
+    ],
+    "max_abs_error": 0.0,
+    "revision": "seed-44",
+    "hub_commit": "9e04ac38bf1a000a16153442c790d367fc702685"
+  },
+  {
+    "repo_id": "bojian1/UniFault-small",
+    "seed": 42,
+    "source_checkpoint": "log/unifault/unifault_default_seed42-9515bd26/pretrain/best_pretrain.pt",
+    "source_sha256": "187366379d3adc44af317cfaf1c1ccaf0fd416ed29667da070a69d06484596d5",
+    "source_commit": "a5015b9d321dec0fd546e0dbd5184127c3a3715e",
+    "epoch": 5,
+    "features_shape": [
+      2,
+      256
+    ],
+    "max_abs_error": 0.0,
+    "revision": "seed-42",
+    "hub_commit": "f685d961ef86fcf730ddd9b5586680082cacaa02"
+  },
+  {
+    "repo_id": "bojian1/UniFault-small",
+    "seed": 43,
+    "source_checkpoint": "log/unifault/unifault_default_seed43-e054efc2/pretrain/best_pretrain.pt",
+    "source_sha256": "61039ceb0ed6e9d0ab1e4167e66e0a6dd027e05653f8ad78c1d99458b34cb431",
+    "source_commit": "a5015b9d321dec0fd546e0dbd5184127c3a3715e",
+    "epoch": 5,
+    "features_shape": [
+      2,
+      256
+    ],
+    "max_abs_error": 0.0,
+    "revision": "seed-43",
+    "hub_commit": "798023b6e07cac5584354d56f167ba9fc5ea5822"
+  },
+  {
+    "repo_id": "bojian1/UniFault-small",
+    "seed": 44,
+    "source_checkpoint": "log/unifault/unifault_default_seed44-29ba4a4a/pretrain/best_pretrain.pt",
+    "source_sha256": "8bb4eb18fa60afa64210c78717c58f170cc64426dbd6399c926836042d01ec9d",
+    "source_commit": "a5015b9d321dec0fd546e0dbd5184127c3a3715e",
+    "epoch": 5,
+    "features_shape": [
+      2,
+      256
+    ],
+    "max_abs_error": 0.0,
+    "revision": "seed-44",
+    "hub_commit": "21fde13e7d733940f75d54e3773a0ca50dbbf4ad"
+  },
+  {
+    "repo_id": "bojian1/UniFault-tiny",
+    "seed": 42,
+    "source_checkpoint": "log/unifault/unifault_default_tiny_seed42-93037bea/pretrain/best_pretrain.pt",
+    "source_sha256": "64a7cf5ad5437bcdad2a5390c1ff982a9ea38ff67cce52faae9246533815cf27",
+    "source_commit": "a5015b9d321dec0fd546e0dbd5184127c3a3715e",
+    "epoch": 5,
+    "features_shape": [
+      2,
+      128
+    ],
+    "max_abs_error": 0.0,
+    "revision": "seed-42",
+    "hub_commit": "7fe72746c69ecf8f38f247be89f562f7347cc6de"
+  },
+  {
+    "repo_id": "bojian1/UniFault-tiny",
+    "seed": 43,
+    "source_checkpoint": "log/unifault/unifault_default_tiny_seed43-ce44969b/pretrain/best_pretrain.pt",
+    "source_sha256": "d690978b0be3f59aa2a1f381608f81747ce3cfa9bb7df936c6ba9500fa8aa2d3",
+    "source_commit": "a5015b9d321dec0fd546e0dbd5184127c3a3715e",
+    "epoch": 5,
+    "features_shape": [
+      2,
+      128
+    ],
+    "max_abs_error": 0.0,
+    "revision": "seed-43",
+    "hub_commit": "b7983cce00edd28896ebcdce8787881da3e44707"
+  },
+  {
+    "repo_id": "bojian1/UniFault-tiny",
+    "seed": 44,
+    "source_checkpoint": "log/unifault/unifault_default_tiny_seed44-dcda3f98/pretrain/best_pretrain.pt",
+    "source_sha256": "838202450d27bd17d46738a8f6fd2b369cb68e92b458a899d4d98da3870319ed",
+    "source_commit": "a5015b9d321dec0fd546e0dbd5184127c3a3715e",
+    "epoch": 5,
+    "features_shape": [
+      2,
+      128
+    ],
+    "max_abs_error": 0.0,
+    "revision": "seed-44",
+    "hub_commit": "b3a2aa2329f0d4e2de2f9415d822c589f5ed58ea"
+  }
+]

@@ -268,3 +268,40 @@ model.safetensors
 ## 📄 许可证
 
 UniFreq 使用 [MIT License](LICENSE)。
+
+## UniFault 与 TF-ProFM
+
+同一推理入口现在也支持 PHMFD 实现的 UniFault 和 TF-ProFM，按 `config.json`
+自动选择模型与预处理。
+
+| 权重 | 特征维度 | 预处理 |
+| --- | ---: | --- |
+| [UniFault-tiny](https://huggingface.co/bojian1/UniFault-tiny) | 128 | 重采样到 1024 点，逐通道 min-max |
+| [UniFault-small](https://huggingface.co/bojian1/UniFault-small) | 256 | 重采样到 1024 点，逐通道 min-max |
+| [TF-ProFM](https://huggingface.co/bojian1/TF-ProFM) | 4096 | 短输入重采样、长输入截取前 2048 点，逐通道 z-score |
+
+各仓库默认使用训练 seed 42，提供 `seed-42`、`seed-43`、`seed-44` revision。
+这些预训练权重不含故障分类头或预训练投影头。UniFault 输出 token 均值特征，
+TF-ProFM 输出通道均值特征；只有 UniFreq 输出时域、频域分支特征。
+
+```bash
+python inference.py --model-id bojian1/UniFault-small \
+  --input samples.npy --output unifault_features.npz
+python inference.py --model-id bojian1/TF-ProFM --revision seed-43 \
+  --input samples.npy --output tf_profm_features.npz --seed 42
+```
+
+TF-ProFM 保留原实现的随机 patch 采样。`--seed` 是推理随机种子，与权重的训练
+seed 独立；复现需固定设备、batch size、输入顺序与 seed。Python API 可在前向前
+调用 `torch.manual_seed(42)`。已发布的 UniFault 权重要求单通道输入。
+两个模型也兼容现有 `downstream.py` 的 KNN 与显式微调入口。
+
+已支持 **UniFault-base 结构**（512 维、12 heads、16 层），注意力投影按原实现
+采用 `12 * floor(512 / 12) = 504` 维，而非要求 512 被 12 整除。
+[base 配置模板](configs/unifault-base.example.json) 是结构示例，不是预训练权重。
+当前可访问的 PHMFD `log/unifault` 中没有发现 base 预训练 checkpoint，因此尚未
+发布 UniFault-base 权重。已有的 `bojian1/UniFreq-base` 属于另一个模型。
+
+权重来源、SHA256 和 Hub commit 记录在
+[published_checkpoints.json](docs/published_checkpoints.json)，各模型的 Hugging Face
+仓库也提供 `provenance.json`。

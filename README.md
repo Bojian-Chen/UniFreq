@@ -280,3 +280,46 @@ unsupported.
 ## 📄 License
 
 UniFreq is released under the [MIT License](LICENSE).
+
+## UniFault and TF-ProFM
+
+The same inference API also loads the PHMFD implementations of UniFault and
+TF-ProFM. Architecture and preprocessing are selected by `config.json`.
+
+| Checkpoint | Feature dimension | Preprocessing |
+| --- | ---: | --- |
+| [UniFault-tiny](https://huggingface.co/bojian1/UniFault-tiny) | 128 | Resample to 1024 points; per-channel min-max |
+| [UniFault-small](https://huggingface.co/bojian1/UniFault-small) | 256 | Resample to 1024 points; per-channel min-max |
+| [TF-ProFM](https://huggingface.co/bojian1/TF-ProFM) | 4096 | Resample shorter signals / truncate longer signals to 2048 points; per-channel z-score |
+
+Each repository defaults to training seed 42 and also provides `seed-42`,
+`seed-43`, and `seed-44` revisions. These are pretrained backbone weights,
+without fault-label classifiers or pretraining projection heads. UniFault
+returns mean-pooled token features; TF-ProFM returns channel-averaged features.
+Only UniFreq outputs `time_features` and `frequency_features`.
+
+```bash
+python inference.py --model-id bojian1/UniFault-small \
+  --input samples.npy --output unifault_features.npz
+python inference.py --model-id bojian1/TF-ProFM --revision seed-43 \
+  --input samples.npy --output tf_profm_features.npz --seed 42
+```
+
+TF-ProFM retains the original random patch sampling. `--seed` controls inference
+randomness independently of the checkpoint training seed. Keep device, batch
+size, input order and seed fixed for reproducibility. In Python, use
+`torch.manual_seed(42)` before the forward pass. Published UniFault checkpoints
+require single-channel input. KNN and explicit downstream fine-tuning also use
+these models through the existing `downstream.py` commands.
+
+UniFault-base **architecture support** is included (512 dimensions, 12 heads,
+16 layers). Its attention projects to `12 * floor(512 / 12) = 504` dimensions,
+matching the original implementation. The
+[base configuration template](configs/unifault-base.example.json) is a structural
+example, not a pretrained checkpoint. No UniFault-base pretraining checkpoint
+was found in the available PHMFD `log/unifault` directory; no base weights have
+been published. `bojian1/UniFreq-base` is a different architecture.
+
+Checkpoint source paths, SHA256 hashes and Hub commit IDs are recorded in
+[published_checkpoints.json](docs/published_checkpoints.json). Each model's Hub
+repository also contains `provenance.json`.

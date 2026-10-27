@@ -14,6 +14,8 @@ def build_parser():
     )
     parser.add_argument("--model-id", required=True)
     parser.add_argument("--revision", default=None)
+    parser.add_argument("--seed", type=int, default=42,
+                        help="Random seed for TF-ProFM patch sampling.")
     parser.add_argument("--token", default=None)
     parser.add_argument("--cache-dir", default=None)
     parser.add_argument("--local-files-only", action="store_true")
@@ -158,11 +160,10 @@ def run(args):
     model = model.to(device).eval()
     processor = UniFreqProcessor(config)
 
-    outputs = {
-        "features": [],
-        "time_features": [],
-        "frequency_features": [],
-    }
+    torch.manual_seed(args.seed)
+    outputs = {"features": []}
+    if config.model_arch == "unifreq":
+        outputs.update({"time_features": [], "frequency_features": []})
     if model.head is not None:
         outputs["logits"] = []
 
@@ -171,17 +172,17 @@ def run(args):
         for samples in _sample_batches(args):
             batch = processor(samples)
             batch = _to_device(batch, device)
-            time_features, frequency_features = model.branch_features(batch)
-            if model.fusion_mode == "concat":
-                features = torch.cat(
-                    [time_features, frequency_features],
-                    dim=1,
-                )
+            if config.model_arch == "unifreq":
+                time_features, frequency_features = model.branch_features(batch)
+                if model.fusion_mode == "concat":
+                    features = torch.cat([time_features, frequency_features], dim=1)
+                else:
+                    features = model.fusion(time_features, frequency_features)
+                outputs["time_features"].append(time_features.cpu())
+                outputs["frequency_features"].append(frequency_features.cpu())
             else:
-                features = model.fusion(time_features, frequency_features)
+                features = model(batch)
             outputs["features"].append(features.cpu())
-            outputs["time_features"].append(time_features.cpu())
-            outputs["frequency_features"].append(frequency_features.cpu())
             if model.head is not None:
                 outputs["logits"].append(model.predict(features).cpu())
             sample_count += len(samples)
